@@ -1,0 +1,52 @@
+{
+  "slug": "ecomeal",
+  "name": "Ecomeal",
+  "ticketPrefix": "ECM",
+  "allowedOrigins": ["https://ecomeal.in", "https://*.ecomeal.in"],
+  "config": {
+    "brand": {
+      "name": "Ecomeal",
+      "logoUrl": "https://ecomeal.in/assets/favicon.png",
+      "websiteUrl": "https://ecomeal.in"
+    },
+    "theme": {
+      "mode": "dark",
+      "accent": "#C7F04A",
+      "accentText": "#0A1410",
+      "background": "#0B1510",
+      "surface": "#121E17",
+      "text": "#E9F1E8",
+      "fontFamily": "Instrument Sans",
+      "googleFont": "Instrument+Sans:wght@400;500;600"
+    },
+    "launcher": { "label": "Support", "position": "right", "offsetX": 20, "offsetY": 20 },
+    "copy": {
+      "title": "Ecomeal Support",
+      "heading": "How can we help?",
+      "description": "We're here to help you resolve your issue quickly.",
+      "ticketCta": "Raise a ticket",
+      "ticketCtaDescription": "Tell us what went wrong. You'll get a ticket ID to track it.",
+      "formHeading": "Raise a ticket",
+      "formDescription": "Tell us what happened and we'll help you resolve it.",
+      "successHeading": "Ticket submitted",
+      "successMessage": "Your support request has been received. Our team will review it and get back to you."
+    },
+    "contactOptions": [
+      { "type": "email", "label": "Email support", "value": "support@ecomeal.in", "description": "Replies within one business day" },
+      { "type": "phone", "label": "Call support", "value": "+917789863214", "description": "For urgent kitchen issues" }
+    ],
+    "form": {
+      "orgLabel": "Restaurant name",
+      "orgPlaceholder": "e.g. Green Bowl, Indiranagar",
+      "descriptionLabel": "What went wrong?",
+      "descriptionPlaceholder": "Describe the issue. Include what you were doing and when it started.",
+      "defaultCountry": "IN",
+      "showCategory": false,
+      "allowAttachments": true
+    },
+    "categories": ["Technical issue", "Order issue", "Billing", "Account", "Integration", "Hardware", "Other"],
+    "timezone": "Asia/Kolkata",
+    "poweredBy": false,
+    "ai": { "enabled": true }
+  }
+}

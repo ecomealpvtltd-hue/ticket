@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo customer site (hostile CSS)</title>
+<style>
+  /* Deliberately hostile host styles: the widget must look identical regardless. */
+  * { font-family: "Comic Sans MS", "Comic Sans", cursive !important; box-sizing: content-box !important; }
+  html { font-size: 22px; }
+  body { margin: 0; background: #fffbe6; color: #7a2e00; line-height: 2.2; letter-spacing: 2px; text-transform: uppercase; }
+  button { background: red !important; color: yellow !important; padding: 30px !important; border: 5px dotted blue !important; border-radius: 0 !important; }
+  div, span, iframe, svg { border: 2px dashed magenta; }
+  iframe { width: 50px !important; height: 50px !important; }
+  svg { width: 100px !important; height: 100px !important; fill: red !important; }
+  header { position: sticky; top: 0; z-index: 99999; background: #333; color: #fff; padding: 12px 24px; }
+  main { padding: 24px; max-width: 900px; margin: 0 auto; }
+  .card { background: white; padding: 24px; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+  <header>Green Bowl — Kitchen dashboard</header>
+  <main>
+    <div class="card"><h1>Tonight's orders</h1><p>This page simulates a customer's website with aggressive global CSS (Comic Sans, !important button styles, bordered divs, resized iframes). The support widget should be unaffected.</p><button type="button">Host page button</button></div>
+    <div class="card"><h2>Inventory</h2><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.</p></div>
+    <div class="card"><h2>Reports</h2><p>Scroll to check the launcher stays fixed and the page remains scrollable.</p></div>
+    <div class="card" style="height: 1200px"><h2>Long content</h2></div>
+  </main>
+  <script src="{{PLATFORM}}/widget.js" data-key="{{WIDGET_KEY}}" async></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.local/
+.netlify/
+.env
+.env.*
+!.env.example
+src/server/generated/
+*.log
+.DS_Store

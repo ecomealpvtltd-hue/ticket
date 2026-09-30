@@ -1,0 +1,47 @@
+{
+  "name": "support-platform",
+  "version": "1.0.0",
+  "description": "Multi-tenant embeddable customer support and ticketing platform (Ecomeal is tenant #1).",
+  "scripts": {
+    "dev": "tsx scripts/build.ts && tsx scripts/dev.ts",
+    "build": "tsx scripts/build.ts",
+    "build:netlify": "tsx scripts/check-env.ts && tsx scripts/build.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "qa": "tsx scripts/qa/run.ts all",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "keys": "tsx scripts/keys.ts"
+  },
+  "license": "UNLICENSED",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@netlify/blobs": "^11.1.2",
+    "lucide-preact": "^1.49.0",
+    "pg": "^8.23.1",
+    "preact": "^10.29.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@fontsource/instrument-sans": "^5.3.0",
+    "@netlify/functions": "^6.0.1",
+    "@netlify/zip-it-and-ship-it": "^16.2.3",
+    "@preact/preset-vite": "^2.10.6",
+    "@sparticuz/chromium": "^153.0.0",
+    "@types/node": "^26.6.3",
+    "@types/pg": "^8.23.1",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
