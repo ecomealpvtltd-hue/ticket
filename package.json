@@ -11,7 +11,8 @@
     "qa": "tsx scripts/qa/run.ts all",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
-    "keys": "tsx scripts/keys.ts"
+    "keys": "tsx scripts/keys.ts",
+    "build:prototype": "tsx scripts/build-prototype.ts"
   },
   "license": "UNLICENSED",
   "type": "module",

@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { ArrowLeft, Download, FileText, Phone, Sparkles, RotateCw, ExternalLink, Copy as CopyIcon, Link2 } from 'lucide-preact';
-import { api, formatBytes, formatDateTime, relativeTime, useApi, type ApiError } from '../lib.js';
+import { api, attachmentUrl, formatBytes, formatDateTime, relativeTime, useApi, type ApiError } from '../lib.js';
 import { Button, ErrorState, Notice, PriorityMark, Skeleton, StatusBadge, useToast } from '../ui.js';
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, formatPhone, type TicketPriority, type TicketStatus } from '../../../shared/constants.js';
 import { can, useMe } from '../main.js';
@@ -134,13 +134,13 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
                 <div class="thumbs">
                   {images.map((a) => (
                     <div class="thumb">
-                      <a href={`/api/admin/attachments/${a.id}?inline=1`} target="_blank" rel="noopener" title={`Open ${a.fileName}`}>
-                        <img src={`/api/admin/attachments/${a.id}?inline=1`} alt={a.fileName} loading="lazy" />
+                      <a href={attachmentUrl(a.id, true)} target="_blank" rel="noopener" title={`Open ${a.fileName}`}>
+                        <img src={attachmentUrl(a.id, true)} alt={a.fileName} loading="lazy" />
                       </a>
                       <div class="thumb-bar">
                         <span class="thumb-name">{a.fileName}</span>
                         {a.driveUrl && <a class="icon-link" href={a.driveUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${a.fileName} in Google Drive`}><ExternalLink size={14} /></a>}
-                        <a class="icon-link" href={`/api/admin/attachments/${a.id}`} aria-label={`Download ${a.fileName}`}><Download size={14} /></a>
+                        <a class="icon-link" href={attachmentUrl(a.id)} aria-label={`Download ${a.fileName}`}><Download size={14} /></a>
                       </div>
                     </div>
                   ))}
@@ -153,7 +153,7 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
                     <span class="file-name">{a.fileName}</span>
                     <span class="file-size">{formatBytes(a.size)}</span>
                     {a.driveUrl && <a class="icon-link" href={a.driveUrl} target="_blank" rel="noopener noreferrer" title="Open in Google Drive" aria-label={`Open ${a.fileName} in Google Drive`}><ExternalLink size={15} /></a>}
-                    <a class="icon-link" href={`/api/admin/attachments/${a.id}`} title="Download" aria-label={`Download ${a.fileName}`}><Download size={15} /></a>
+                    <a class="icon-link" href={attachmentUrl(a.id)} title="Download" aria-label={`Download ${a.fileName}`}><Download size={15} /></a>
                   </li>
                 ))}
               </ul>}

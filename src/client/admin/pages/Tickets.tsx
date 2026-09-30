@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Search, Paperclip, ChevronLeft, ChevronRight } from 'lucide-preact';
-import { navigate, useApi, useDebounced, useLocation, relativeTime, formatDateTime } from '../lib.js';
+import { currentSearch, navigate, useApi, useDebounced, useLocation, relativeTime, formatDateTime } from '../lib.js';
 import { Empty, ErrorState, PageHeader, PriorityMark, Skeleton, StatusBadge } from '../ui.js';
 import { PRIORITY_LABEL, formatPhone, type TicketPriority, type TicketStatus } from '../../../shared/constants.js';
 import { useMe } from '../main.js';
@@ -24,7 +24,7 @@ export function Tickets() {
   const debouncedQ = useDebounced(q.trim(), 250);
 
   function setParam(changes: Record<string, string | null>) {
-    const p = new URLSearchParams(location.search);
+    const p = new URLSearchParams(currentSearch());
     for (const [k, v] of Object.entries(changes)) {
       if (v === null || v === '' || (k === 'status' && v === 'all') || (k === 'priority' && v === 'all') || (k === 'sort' && v === 'newest') || (k === 'page' && v === '1')) p.delete(k);
       else p.set(k, v);

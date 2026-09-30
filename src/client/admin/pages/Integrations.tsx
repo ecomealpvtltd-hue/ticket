@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { ExternalLink, RotateCw } from 'lucide-preact';
-import { api, relativeTime, useApi, useLocation, type ApiError } from '../lib.js';
+import { api, prototype, relativeTime, useApi, useLocation, type ApiError } from '../lib.js';
 import { Button, Empty, ErrorState, Notice, PageHeader, Section, Skeleton, useToast } from '../ui.js';
 import { can, useMe } from '../main.js';
 
@@ -90,6 +90,7 @@ export function Integrations() {
               <div class="integration-actions">
                 {g?.status === 'connected'
                   ? <Button size="sm" variant="ghost" onClick={disconnect} loading={busy === 'disconnect'}>Disconnect</Button>
+                  : prototype ? <span class="integration-sub">Connecting Google is available on the live deployment.</span>
                   : <Button variant="primary" href="/api/integrations/google/start">{g?.status === 'error' ? 'Reconnect Google' : 'Connect Google'}</Button>}
               </div>
             )}

@@ -8,3 +8,4 @@ dist/
 src/server/generated/
 *.log
 .DS_Store
+dist-prototype/

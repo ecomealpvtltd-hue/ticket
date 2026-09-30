@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Plus, Trash2, RefreshCw } from 'lucide-preact';
-import { api, relativeTime, useApi, type ApiError } from '../lib.js';
+import { api, prototype, relativeTime, useApi, type ApiError } from '../lib.js';
 import { Button, CopyButton, ErrorState, Notice, PageHeader, Section, Skeleton, useToast } from '../ui.js';
 import { can, useMe } from '../main.js';
 
@@ -130,7 +130,7 @@ export function Widget() {
 
       <Section title="Preview" description="This is what customers see. It reflects saved settings."
         actions={<Button size="sm" onClick={() => setPreviewKey((k) => k + 1)}><RefreshCw size={14} aria-hidden="true" />Reload</Button>}>
-        {key && <div class="preview"><iframe key={previewKey} title="Widget preview" src={`${data!.baseUrl}/embed/${key.publicKey}`} /></div>}
+        {key && <div class="preview"><iframe key={previewKey} title="Widget preview" src={prototype ? prototype.embedUrl(key.publicKey) : `${data!.baseUrl}/embed/${key.publicKey}`} /></div>}
       </Section>
 
       <Section title="Keys" description="Widget keys are public by design: they identify your workspace but cannot read any data. Rotate a key by creating a new one, updating your snippet, then revoking the old one."

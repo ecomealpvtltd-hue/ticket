@@ -1,0 +1,132 @@
+<title>Ecomeal Support Prototype</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a fixed prototype bar on top; below it either the customer's app (with the widget) or the team dashboard. */
+  :root {
+    --bar: #0b1510; --bar-fg: #e9f1e8; --bar-muted: rgba(233, 241, 232, .62); --bar-line: rgba(233, 241, 232, .12);
+    --lime: #c7f04a; --on-lime: #0a1410;
+    --bg: #f3f4f1; --panel: #ffffff; --fg: #17201b; --muted: #5d665f; --line: #e1e4de;
+    --ok: #1f7a4a; --warn: #a55f00; --bad: #b7352c;
+    --sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --bar-h: 56px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #101412; --panel: #171c19; --fg: #e6ece7; --muted: #9aa59d; --line: #28302b; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #101412; --panel: #171c19; --fg: #e6ece7; --muted: #9aa59d; --line: #28302b; color-scheme: dark; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+  .bar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bar); color: var(--bar-fg);
+    display: flex; align-items: center; gap: 16px; min-height: var(--bar-h); padding: 8px 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; white-space: nowrap; }
+  .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--lime); color: var(--on-lime); display: grid; place-items: center; font-weight: 600; }
+  .proto { font-weight: 500; color: var(--bar-muted); }
+  .switch { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--bar-line); border-radius: 10px; margin-left: auto; }
+  .switch button { height: 34px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--bar-muted); font: 500 14px var(--sans); cursor: pointer; }
+  .switch button:hover { color: var(--bar-fg); }
+  .switch button[aria-selected="true"] { background: var(--lime); color: var(--on-lime); }
+  .reset { height: 34px; padding: 0 12px; border: 1px solid var(--bar-line); border-radius: 8px; background: transparent; color: var(--bar-muted); font: 500 13px var(--sans); cursor: pointer; }
+  .reset:hover { color: var(--bar-fg); }
+  .confirm { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--bar-muted); }
+  .confirm button { height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--bar-line); background: transparent; color: var(--bar-fg); font: 500 13px var(--sans); cursor: pointer; }
+  .confirm .yes { background: var(--bar-fg); color: var(--bar); border-color: var(--bar-fg); }
+  .note { margin: 0; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; padding: 8px 16px; }
+  .note b { color: var(--fg); font-weight: 600; }
+
+  /* Customer's app (a stand-in for Ekosku) */
+  .site { max-width: 1080px; margin: 0 auto; padding: 28px 16px 120px; }
+  .site-hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .site-hd h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+  .site-hd p { margin: 2px 0 0; color: var(--muted); }
+  .help { height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: 500 14px var(--sans); cursor: pointer; }
+  .help:hover { border-color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat span { display: block; color: var(--muted); font-size: 13px; }
+  .stat strong { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .card h2 { margin: 0 0 10px; font-size: 15px; }
+  .orders { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .orders td { padding: 9px 0; border-top: 1px solid var(--line); }
+  .orders td:last-child { text-align: right; }
+  .src { color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 500; }
+  .late { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+  .prep { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+  .ready { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+  .alert { margin: 0; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--bad) 8%, var(--panel)); font-size: 14px; }
+  .hint { margin-top: 18px; display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 14px; }
+  .hint b { color: var(--fg); }
+  .dash { height: calc(100vh - var(--bar-h) - 38px); height: calc(100dvh - var(--bar-h) - 38px); }
+  .dash iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid { grid-template-columns: 1fr; }
+    .switch { margin-left: 0; order: 3; width: 100%; }
+    .switch button { flex: 1; padding: 0 8px; }
+    .proto { display: none; }
+    .dash { height: calc(100dvh - 140px); }
+  }
+</style>
+
+<header class="bar">
+  <div class="brand"><span class="mark" aria-hidden="true">e</span>Ecomeal Support <span class="proto">Prototype</span></div>
+  <div class="switch" role="tablist" aria-label="Choose a view">
+    <button role="tab" data-view="site" aria-selected="true" id="tab-site">Customer's app</button>
+    <button role="tab" data-view="dash" aria-selected="false" id="tab-dash">Support team dashboard</button>
+  </div>
+  <button class="reset" id="reset" type="button">Reset</button>
+  <div class="confirm" id="reset-confirm" hidden>Clear tickets you created here?
+    <button class="yes" id="reset-yes" type="button">Clear</button><button id="reset-no" type="button">Cancel</button>
+  </div>
+</header>
+<p class="note">Prototype running in your browser. <b>Tickets you raise are stored on this device only</b>; three example tickets are included. The live version stores tickets in the database and copies them to Google Sheets and Drive.</p>
+
+<main id="view-site">
+  <div class="site">
+    <div class="site-hd">
+      <div>
+        <h1>Tonight at Green Bowl, Indiranagar</h1>
+        <p>Sample restaurant screen standing in for a customer's app. The support widget is installed with one script tag.</p>
+      </div>
+      <button class="help" id="open-support" type="button">Need help?</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Orders tonight</span><strong>142</strong></div>
+      <div class="stat"><span>In prep</span><strong>18</strong></div>
+      <div class="stat"><span>Delayed</span><strong>3</strong></div>
+      <div class="stat"><span>Avg. prep time</span><strong>14 min</strong></div>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>Order queue</h2>
+        <table class="orders">
+          <tbody>
+            <tr><td>#4821 <span class="src">Swiggy</span></td><td>Paneer tikka bowl ×2</td><td><span class="pill late">7 min late</span></td></tr>
+            <tr><td>#4822 <span class="src">Zomato</span></td><td>Veg biryani, raita</td><td><span class="pill prep">In prep</span></td></tr>
+            <tr><td>#4823 <span class="src">Dine-in T6</span></td><td>Masala dosa ×3</td><td><span class="pill prep">In prep</span></td></tr>
+            <tr><td>#4824 <span class="src">Swiggy</span></td><td>Millet khichdi</td><td><span class="pill ready">Ready</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="card">
+        <h2>Kitchen alerts</h2>
+        <p class="alert">Aggregator sync failed at 7:02 PM. New Swiggy orders may not be arriving.</p>
+      </section>
+    </div>
+    <p class="hint"><span>Try it: click <b>Support</b> in the bottom-right corner (or <b>Need help?</b>), raise a ticket with a screenshot, then switch to <b>Support team dashboard</b> to work it.</span></p>
+  </div>
+</main>
+
+<main id="view-dash" class="dash" hidden>
+  <iframe id="dash-frame" title="Support team dashboard"></iframe>
+</main>
+
+<script type="module" src="./shell-entry.ts"></script>

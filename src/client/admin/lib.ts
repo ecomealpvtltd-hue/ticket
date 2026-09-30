@@ -26,7 +26,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     throw new ApiError(0, 'network', 'Could not reach the server. Check your connection.');
   }
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
-    const next = location.pathname + location.search;
+    const next = currentUrl().pathname + currentUrl().search;
     navigate(`/admin/login?next=${encodeURIComponent(next)}`, true);
     throw new ApiError(401, 'unauthorized', 'Sign in required.');
   }
@@ -58,17 +58,34 @@ export function useApi<T>(path: string | null, deps: unknown[] = []) {
 }
 
 // ---------------------------------------------------------------------------
-// Router (history API, /admin base)
+// Prototype hooks (only present in the offline prototype build)
+// ---------------------------------------------------------------------------
+
+interface PrototypeHooks { attachmentUrl(id: string, inline: boolean): string; embedUrl(key: string): string }
+export const prototype: PrototypeHooks | undefined = (window as any).__SP_PROTOTYPE;
+export const attachmentUrl = (id: string, inline = false) =>
+  prototype ? prototype.attachmentUrl(id, inline) : `/api/admin/attachments/${id}${inline ? '?inline=1' : ''}`;
+
+// ---------------------------------------------------------------------------
+// Router (history API with /admin base; in-memory in the prototype)
 // ---------------------------------------------------------------------------
 
 const listeners = new Set<() => void>();
+let memoryUrl = '/admin';
 export function navigate(to: string, replace = false) {
-  if (replace) history.replaceState(null, '', to);
+  if (prototype) memoryUrl = to;
+  else if (replace) history.replaceState(null, '', to);
   else history.pushState(null, '', to);
   listeners.forEach((l) => l());
   window.scrollTo(0, 0);
 }
 window.addEventListener('popstate', () => listeners.forEach((l) => l()));
+
+function currentUrl() {
+  if (prototype) return new URL(memoryUrl, 'http://x');
+  return new URL(location.href);
+}
+export function currentSearch() { return currentUrl().search; }
 
 export function useLocation() {
   const [, force] = useState(0);
@@ -77,7 +94,8 @@ export function useLocation() {
     listeners.add(l);
     return () => { listeners.delete(l); };
   }, []);
-  return { pathname: location.pathname.replace(/\/+$/, '') || '/', search: new URLSearchParams(location.search) };
+  const u = currentUrl();
+  return { pathname: u.pathname.replace(/\/+$/, '') || '/', search: new URLSearchParams(u.search) };
 }
 
 /** Intercept clicks on internal links so navigation stays client-side. */
