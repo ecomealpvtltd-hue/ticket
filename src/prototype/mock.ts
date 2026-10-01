@@ -4,6 +4,7 @@
 
 import { COUNTRIES, normalizePhone, PRIORITIES, STATUSES } from '../shared/constants.js';
 import ecomeal from '../../tenants/ecomeal.json';
+import { LOGO_DATA_URL } from './logo.ts';
 
 type Status = (typeof STATUSES)[number];
 type Priority = (typeof PRIORITIES)[number];
@@ -32,7 +33,7 @@ export const DEMO_ADMIN = { id: 'admin-1', email: 'you@ecomeal.in', name: 'Ecome
 
 function seed(): State {
   const s: State = {
-    v: 2, seq: 0, config: ecomeal.config, allowedOrigins: ecomeal.allowedOrigins,
+    v: 2, seq: 0, config: { ...ecomeal.config, brand: { ...ecomeal.config.brand, logoUrl: LOGO_DATA_URL } }, allowedOrigins: ecomeal.allowedOrigins,
     keys: [{ id: 'key-1', publicKey: PUBLIC_KEY, label: 'Default', createdAt: ago(60 * 24 * 3), revokedAt: null, lastSeenAt: ago(2), lastSeenOrigin: 'https://ecomeal.in' }],
     tickets: [], events: [], attachments: [],
     team: [
@@ -57,7 +58,7 @@ function seed(): State {
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) { const s = JSON.parse(raw); if (s.v === 2) return s; }
+    if (raw) { const s = JSON.parse(raw); if (s.v === 2) { if (/^https:\/\/ecomeal\.in\//.test(s.config?.brand?.logoUrl ?? '')) s.config.brand.logoUrl = LOGO_DATA_URL; return s; } }
   } catch { /* storage unavailable */ }
   const s = seed();
   save(s);
