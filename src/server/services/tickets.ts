@@ -5,6 +5,7 @@ import { normalizePhone, PRIORITIES, STATUSES, type TicketPriority, type TicketS
 import type { Tenant } from './tenants.js';
 import { enqueueJob, type JobKind } from './jobs.js';
 import { aiAvailable } from '../ai/index.js';
+import { classify } from '../ai/rules.js';
 
 // ---------------------------------------------------------------------------
 // Input validation
@@ -90,15 +91,20 @@ export async function createTicket(
   const duplicateOf = dup.rows[0] ?? null;
 
   const useAi = aiAvailable() && tenant.config.ai.enabled;
+  // Instant, offline triage so every ticket is bucketed even when AI is off.
+  const rules = classify(input.description, tenant.config.categories);
+  const category = input.category ?? rules.category;
+  const categorySource = input.category ? 'customer' : rules.category ? 'rules' : null;
 
   const t = await db.query(
-    `INSERT INTO tickets (tenant_id, seq, number, customer_id, name, phone, email, org_name, category,
-                          description, duplicate_of, ai_status, meta)
-     VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), $8, $9, $10, $11, $12, $13)
+    `INSERT INTO tickets (tenant_id, seq, number, customer_id, name, phone, email, org_name, category, category_source,
+                          description, duplicate_of, ai_status, ai_category, ai_priority, ai_reason, triage_source, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), $8, $9, $10, $11, $12, $13, $14, $15, $16, 'rules', $17)
      RETURNING id`,
     [
       tenant.id, seq, number, customerId, input.name, input.phone, input.email ?? '', input.orgName,
-      input.category ?? null, input.description, duplicateOf?.id ?? null, useAi ? 'pending' : 'disabled',
+      category, categorySource, input.description, duplicateOf?.id ?? null, useAi ? 'pending' : 'disabled',
+      rules.category, rules.priority, rules.reason,
       JSON.stringify({ userAgent: meta.userAgent?.slice(0, 300) ?? null, pageUrl: meta.pageUrl ?? null, origin: meta.origin ?? null }),
     ],
   );
@@ -122,6 +128,8 @@ export async function createTicket(
   // 5. Timeline
   await addEvent(db, tenant.id, ticketId, { actorType: 'customer', actorLabel: input.name, type: 'created',
     data: { attachments: attachmentCount, category: input.category ?? null } });
+  await addEvent(db, tenant.id, ticketId, { actorType: 'system', type: 'auto_triage',
+    data: { category: categorySource === 'rules' ? rules.category : null, priority: rules.priority } });
   if (duplicateOf) {
     await addEvent(db, tenant.id, ticketId, { actorType: 'system', type: 'possible_duplicate',
       data: { of: duplicateOf.number } });
@@ -288,7 +296,8 @@ export async function getTicketDetail(db: Db, tenantId: string, ref: string) {
     category: t.category,
     description: t.description,
     customer: { id: t.customer_id, name: t.name, phone: t.phone, email: t.email, orgName: t.org_name, ticketCount: customerTickets.rows[0].n },
-    ai: { status: t.ai_status, category: t.ai_category, priority: t.ai_priority, summary: t.ai_summary, reason: t.ai_reason },
+    categorySource: t.category_source,
+    ai: { status: t.ai_status, source: t.triage_source, category: t.ai_category, priority: t.ai_priority, summary: t.ai_summary, reason: t.ai_reason },
     duplicateOf: t.duplicate_number ?? null,
     meta: t.meta,
     createdAt: t.created_at,
@@ -338,7 +347,7 @@ export async function updateTicket(db: Db, tenant: Tenant, ticketId: string, raw
     changes.push({ type: 'priority_changed', from: t.priority, to: patch.priority });
   }
   if (patch.category !== undefined && (patch.category || null) !== t.category) {
-    args.push(patch.category || null); sets.push(`category = $${args.length}`);
+    args.push(patch.category || null); sets.push(`category = $${args.length}`, `category_source = 'agent'`);
     changes.push({ type: 'category_changed', from: t.category, to: patch.category || null });
   }
   if (!sets.length) return { changed: false };

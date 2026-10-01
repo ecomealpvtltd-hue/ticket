@@ -25,7 +25,9 @@ export function registerAIJobs() {
       await withTenant(job.tenant_id, async (db) => {
         await db.query(
           `UPDATE tickets SET ai_status = 'done', ai_category = $2, ai_priority = $3, ai_summary = $4, ai_reason = $5,
-                  category = coalesce(category, $2)
+                  triage_source = 'ai',
+                  category = CASE WHEN category IS NULL OR category_source IN ('rules') THEN $2 ELSE category END,
+                  category_source = CASE WHEN category IS NULL OR category_source IN ('rules') THEN 'ai' ELSE category_source END
             WHERE id = $1`,
           [job.ticket_id, result.category, result.priority, result.summary, result.reason],
         );

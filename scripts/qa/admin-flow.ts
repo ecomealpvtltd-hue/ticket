@@ -71,10 +71,13 @@ export async function adminFlow(_browser: Browser, qa: QA) {
     await overflow(page, `${vp.name} ticket`, issues);
 
     if (vp.name === 'desktop') {
-      await page.selectOption('#priority', 'high');
+      await page.click('.seg-prio .seg-btn:not(.on) >> nth=-1');
       await page.waitForSelector('.toast');
-      await page.selectOption('#status', 'in_progress');
-      await page.waitForTimeout(500);
+      if (!(await page.$('.seg-status .st-in_progress.on'))) {
+        await page.click('.seg-status .st-in_progress');
+        await page.waitForSelector('.seg-status .st-in_progress.on');
+      }
+      await page.waitForTimeout(400);
       await page.fill('#note', 'Called the restaurant. Restarting the POS sync service; will confirm in 15 minutes.');
       await page.click('.note-form button[type=submit]');
       await page.waitForSelector('.tl-note');
@@ -87,8 +90,8 @@ export async function adminFlow(_browser: Browser, qa: QA) {
       // Persistence after reload
       await page.reload();
       await page.waitForSelector('.detail');
-      const status = await page.inputValue('#status');
-      if (status !== 'in_progress') issues.push(`[admin] status did not persist (got ${status})`);
+      const persisted = await page.waitForSelector('.seg-status .st-in_progress.on', { timeout: 5000 }).catch(() => null);
+      if (!persisted) issues.push('[admin] status did not persist');
     }
 
     await page.goto(`${PLATFORM}/admin/widget`);

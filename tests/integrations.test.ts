@@ -53,8 +53,9 @@ describe('Google Sheets and Drive sync', () => {
     const rows = google.sheets.get(settings.spreadsheetId!)!;
     expect(rows).toHaveLength(2);
     expect(rows[1][0]).toBe(data.ticket.number);
+    expect(rows[0]).toContain('Category set by');
     expect(rows[1][3]).toBe('+91 98765 43210');
-    expect(rows[1][7]).toBe('Open');
+    expect(rows[1][9]).toBe('Open');
   });
 
   it('files attachments under Attachments/<date>/ named after the ticket, and links them in the Sheet', async () => {
@@ -82,7 +83,7 @@ describe('Google Sheets and Drive sync', () => {
     expect(byName(data.ticket.number)).toHaveLength(0); // no per-ticket folders any more
 
     const row = google.sheets.get(settings.spreadsheetId!)!.find((r) => r[0] === data.ticket.number)!;
-    expect(row[10]).toMatch(new RegExp(`^${data.ticket.number}\\.png: https://drive\\.google\\.com/file/d/.+\\n${data.ticket.number}-2\\.pdf: https://`));
+    expect(row[12]).toMatch(new RegExp(`^${data.ticket.number}\\.png: https://drive\\.google\\.com/file/d/.+\\n${data.ticket.number}-2\\.pdf: https://`));
     const detail = (await admin(t, 'GET', `/api/admin/tickets/${data.ticket.number}`)).data;
     expect(detail.attachments.every((x: any) => /drive\.google\.com/.test(x.driveUrl))).toBe(true);
     expect(detail.sync.drive_upload.status).toBe('done');
@@ -101,7 +102,7 @@ describe('Google Sheets and Drive sync', () => {
     await runJobs({ budgetMs: 5000 });
     const rows = google.sheets.get(settings.spreadsheetId!)!;
     expect(rows.filter((r) => r[0] === data.ticket.number)).toHaveLength(1);
-    expect(rows.find((r) => r[0] === data.ticket.number)![7]).toBe('Resolved');
+    expect(rows.find((r) => r[0] === data.ticket.number)![9]).toBe('Resolved');
   });
 
   it('Google failing never loses the ticket: it retries, and a manual retry recovers', async () => {

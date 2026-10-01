@@ -153,7 +153,7 @@ describe('ticket workflow', () => {
     const res = await admin(A, 'PATCH', `/api/admin/tickets/${detail.id}`, { status: 'resolved' });
     expect(res.data.status).toBe('resolved');
     expect(res.data.resolvedAt).toBeTruthy();
-    expect(res.data.events.map((e: any) => e.type)).toEqual(['created', 'priority_changed', 'status_changed', 'note', 'status_changed']);
+    expect(res.data.events.map((e: any) => e.type)).toEqual(['created', 'auto_triage', 'priority_changed', 'status_changed', 'note', 'status_changed']);
   });
 
   it('search finds tickets by number, name, phone, restaurant and text', async () => {

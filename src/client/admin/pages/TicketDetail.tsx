@@ -8,7 +8,8 @@ import { can, useMe } from '../main.js';
 interface Detail {
   id: string; number: string; status: TicketStatus; priority: TicketPriority; category: string | null; description: string;
   customer: { id: string; name: string; phone: string; email: string | null; orgName: string; ticketCount: number };
-  ai: { status: string; category: string | null; priority: TicketPriority | null; summary: string | null; reason: string | null };
+  categorySource: 'customer' | 'rules' | 'ai' | 'agent' | null;
+  ai: { status: string; source: 'rules' | 'ai' | null; category: string | null; priority: TicketPriority | null; summary: string | null; reason: string | null };
   duplicateOf: string | null;
   meta: { pageUrl?: string | null; driveFolderUrl?: string };
   createdAt: string; updatedAt: string; resolvedAt: string | null;
@@ -80,7 +81,13 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
     );
   }
 
-  const aiUseful = t.ai.status === 'done' && t.ai.priority && t.ai.priority !== t.priority;
+  const aiUseful = !!t.ai.priority && t.ai.priority !== t.priority;
+  const NEXT: Record<TicketStatus, Array<{ to: TicketStatus; label: string; primary?: boolean }>> = {
+    open: [{ to: 'in_progress', label: 'Start working', primary: true }, { to: 'resolved', label: 'Mark resolved' }],
+    in_progress: [{ to: 'resolved', label: 'Mark resolved', primary: true }, { to: 'open', label: 'Back to open' }],
+    resolved: [{ to: 'closed', label: 'Close ticket', primary: true }, { to: 'open', label: 'Reopen' }],
+    closed: [{ to: 'open', label: 'Reopen', primary: true }],
+  };
   const images = t.attachments.filter((a) => a.mimeType.startsWith('image/'));
   const files = t.attachments.filter((a) => !a.mimeType.startsWith('image/'));
 
@@ -94,6 +101,16 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
           <PriorityMark priority={t.priority} />
         </div>
         <p class="page-desc">{t.customer.orgName}, raised {relativeTime(t.createdAt)} by {t.customer.name}</p>
+        {canEdit && (
+          <div class="quick-actions" role="group" aria-label="Quick actions">
+            {NEXT[t.status].map((a) => (
+              <Button variant={a.primary ? 'primary' : 'secondary'} onClick={() => patch('status', a.to)} loading={saving === 'status' && a.primary}
+                disabled={saving === 'status'}>
+                {a.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div class="detail">
@@ -107,14 +124,15 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
           <section class="panel p-issue">
             <h2 class="panel-title">Issue</h2>
             <p class="issue-text">{t.description}</p>
-            {t.ai.status === 'done' && t.ai.summary && (
+            {(t.ai.summary || t.ai.priority) && (
               <div class="ai">
                 <Sparkles size={15} strokeWidth={1.75} aria-hidden="true" />
                 <div class="ai-body">
-                  <p class="ai-summary">{t.ai.summary}</p>
+                  {t.ai.summary && <p class="ai-summary">{t.ai.summary}</p>}
                   <p class="ai-meta">
-                    Suggested: {t.ai.category}{t.ai.priority && <>, {PRIORITY_LABEL[t.ai.priority]} priority</>}
-                    {t.ai.reason && <> — {t.ai.reason}</>}
+                    {t.ai.source === 'ai' ? 'AI suggests' : 'Auto-detected'}: {t.ai.category ?? 'no clear category'}
+                    {t.ai.priority && <>, {PRIORITY_LABEL[t.ai.priority]} priority</>}
+                    {t.ai.reason && <>. {t.ai.reason.replace(/\.$/, '')}</>}
                   </p>
                   {aiUseful && canEdit && (
                     <Button size="sm" onClick={() => patch('priority', t.ai.priority!)} loading={saving === 'priority'}>
@@ -183,19 +201,29 @@ export function TicketDetail({ ticketRef }: { ticketRef: string }) {
         <aside class="detail-side">
           <section class="panel p-controls">
             <div class="field">
-              <label class="field-label" for="status">Status</label>
-              <select id="status" class="input" value={t.status} disabled={!canEdit || saving === 'status'} onChange={(e) => patch('status', (e.target as HTMLSelectElement).value)}>
-                {STATUSES.map((s) => <option value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
+              <span class="field-label" id="status-label">Status</span>
+              <div class="seg seg-status" role="radiogroup" aria-labelledby="status-label">
+                {STATUSES.map((st) => (
+                  <button type="button" role="radio" aria-checked={t.status === st} class={`seg-btn st-${st} ${t.status === st ? 'on' : ''}`}
+                    disabled={!canEdit || saving === 'status'} onClick={() => t.status !== st && patch('status', st)}>
+                    <span class="status-dot" aria-hidden="true" />{STATUS_LABEL[st]}
+                  </button>
+                ))}
+              </div>
             </div>
             <div class="field">
-              <label class="field-label" for="priority">Priority</label>
-              <select id="priority" class="input" value={t.priority} disabled={!canEdit || saving === 'priority'} onChange={(e) => patch('priority', (e.target as HTMLSelectElement).value)}>
-                {PRIORITIES.map((p) => <option value={p}>{PRIORITY_LABEL[p]}</option>)}
-              </select>
+              <span class="field-label" id="priority-label">Priority</span>
+              <div class="seg seg-prio" role="radiogroup" aria-labelledby="priority-label">
+                {PRIORITIES.map((p) => (
+                  <button type="button" role="radio" aria-checked={t.priority === p} class={`seg-btn pr-${p} ${t.priority === p ? 'on' : ''}`}
+                    disabled={!canEdit || saving === 'priority'} onClick={() => t.priority !== p && patch('priority', p)}>
+                    {PRIORITY_LABEL[p]}
+                  </button>
+                ))}
+              </div>
             </div>
             <div class="field">
-              <label class="field-label" for="category">Category</label>
+              <label class="field-label" for="category">Category {t.category && t.categorySource && <span class="optional">({ { customer: 'set by customer', rules: 'auto-detected', ai: 'set by AI', agent: 'set by team' }[t.categorySource] })</span>}</label>
               <select id="category" class="input" value={t.category ?? ''} disabled={!canEdit || saving === 'category'} onChange={(e) => patch('category', (e.target as HTMLSelectElement).value || null)}>
                 <option value="">None</option>
                 {me.tenant.config.categories.map((c) => <option value={c}>{c}</option>)}
@@ -268,6 +296,7 @@ function TimelineItem({ e }: { e: Detail['events'][number] }) {
     case 'status_changed': text = <><b>{who}</b> changed status from {STATUS_LABEL[e.data.from as TicketStatus]} to <b>{STATUS_LABEL[e.data.to as TicketStatus]}</b></>; break;
     case 'priority_changed': text = <><b>{who}</b> changed priority from {PRIORITY_LABEL[e.data.from as TicketPriority]} to <b>{PRIORITY_LABEL[e.data.to as TicketPriority]}</b></>; break;
     case 'category_changed': text = <><b>{who}</b> set category to <b>{e.data.to ?? 'None'}</b></>; break;
+    case 'auto_triage': text = <>Auto-detected {e.data.category ? <><b>{e.data.category}</b>, </> : null}{PRIORITY_LABEL[e.data.priority as TicketPriority]} priority suggested</>; break;
     case 'ai_triage': text = <>AI suggested <b>{e.data.category}</b>, {PRIORITY_LABEL[e.data.priority as TicketPriority]} priority</>; break;
     case 'possible_duplicate': text = <>Flagged as a possible duplicate of <a href={`/admin/tickets/${e.data.of}`}>{e.data.of}</a></>; break;
     case 'note': text = <><b>{who}</b> added a note</>; break;

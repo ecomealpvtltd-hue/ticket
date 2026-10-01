@@ -488,3 +488,24 @@ a.list-row:hover { background: var(--hover); text-decoration: none; }
 }
 
 .notice-detail { display: block; margin-top: 4px; color: var(--muted); font-family: var(--mono); font-size: var(--fs-xs); word-break: break-word; }
+
+/* Quick actions + segmented controls on the ticket page */
+.quick-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+.seg { display: grid; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); }
+.seg-status { grid-template-columns: 1fr 1fr; }
+.seg-prio { grid-template-columns: repeat(4, 1fr); }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; white-space: nowrap; }
+.seg-btn:hover:not(:disabled):not(.on) { background: var(--hover); color: var(--text); }
+.seg-btn.on { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(16, 20, 28, .06); }
+.seg-btn:disabled { cursor: default; }
+.seg-btn:disabled:not(.on) { opacity: .55; }
+.seg-btn .status-dot { width: 7px; height: 7px; border-radius: 50%; }
+.st-open .status-dot { background: var(--open); }
+.st-in_progress .status-dot { background: var(--progress); }
+.st-resolved .status-dot { background: var(--resolved); }
+.st-closed .status-dot { box-shadow: inset 0 0 0 1.5px var(--closed); }
+.pr-urgent.on { color: var(--urgent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--urgent) 45%, var(--line)); }
+.pr-high.on { color: var(--high); }
+@media (max-width: 900px) { .p-controls { grid-template-columns: 1fr 1fr !important; } .p-controls .field:last-child { grid-column: 1 / -1; } }
+@media (max-width: 800px) { .p-controls { grid-template-columns: 1fr !important; } .quick-actions .btn { flex: 1; } }

@@ -87,6 +87,7 @@ export interface GoogleSettings {
   spreadsheetId?: string;
   spreadsheetUrl?: string;
   sheetTitle?: string;
+  layoutVersion?: number;
   attachmentsFolderId?: string;
   /** Day folder ids under Attachments, keyed by YYYY-MM-DD (tenant timezone). */
   dayFolders?: Record<string, string>;
@@ -252,10 +253,14 @@ export class GoogleClient {
 // ---------------------------------------------------------------------------
 
 export const SHEET_TITLE = 'Tickets';
+/** Bump when columns change: the header is rewritten and every ticket row is re-synced. */
+export const SHEET_LAYOUT_VERSION = 2;
 export function sheetHeader(tenant: Tenant): string[] {
   return ['Ticket ID', 'Created', 'Name', 'Phone', tenant.config.form.orgLabel.replace(/ name$/i, '') || 'Organisation',
-    'Category', 'Priority', 'Status', 'Issue', 'Summary', 'Attachments', 'Last updated', 'Open in dashboard'];
+    'Category', 'Category set by', 'Priority', 'Suggested priority', 'Status', 'Issue', 'Summary', 'Attachments',
+    'Last updated', 'Open in dashboard'];
 }
+const CATEGORY_SOURCE_LABEL: Record<string, string> = { customer: 'Customer', rules: 'Auto', ai: 'AI', agent: 'Team' };
 
 /** Store credentials and make sure the tenant's folder and spreadsheet exist (reusing them if still there). */
 export async function connectGoogle(tenant: Tenant, adminId: string, tokens: TokenResponse, identity: GoogleIdentity) {
@@ -293,11 +298,12 @@ export async function connectGoogle(tenant: Tenant, adminId: string, tokens: Tok
     const sheetId = ss.sheetId;
     await client.batchUpdate(ss.spreadsheetId, [
       { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: 'userEnteredFormat.textFormat.bold' } },
-      { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 8, endIndex: 10 }, properties: { pixelSize: 360 }, fields: 'pixelSize' } },
+      { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 10, endIndex: 12 }, properties: { pixelSize: 360 }, fields: 'pixelSize' } },
     ]).catch((e) => log.warn('google.sheet_format_failed', { message: errorMessage(e) }));
     settings.spreadsheetId = ss.spreadsheetId;
     settings.spreadsheetUrl = ss.spreadsheetUrl;
     settings.sheetTitle = SHEET_TITLE;
+    settings.layoutVersion = SHEET_LAYOUT_VERSION;
   }
 
   await withTenant(tenant.id, async (db) => {
@@ -451,6 +457,17 @@ async function sheetSync(job: Job) {
   const sheet = client.settings.sheetTitle ?? SHEET_TITLE;
   if (!ssId) throw new IntegrationNotConnected('Google Sheet is not set up. Reconnect Google.');
 
+  // Column layout changed since this Sheet was created: rewrite the header, re-sync every row.
+  if ((client.settings.layoutVersion ?? 1) < SHEET_LAYOUT_VERSION) {
+    await client.putRow(ssId, `${sheet}!A1`, sheetHeader(tenant));
+    await withTenant(job.tenant_id, async (db) => {
+      await db.query(`UPDATE integrations SET settings = settings || jsonb_build_object('layoutVersion', $2::int) WHERE tenant_id = $1 AND provider = 'google'`, [job.tenant_id, SHEET_LAYOUT_VERSION]);
+      const others = await db.query(`SELECT id FROM tickets WHERE id <> $1`, [job.ticket_id]);
+      for (const o of others.rows) await enqueueJob(db, job.tenant_id, o.id, 'sheet_sync', { blocked: false });
+    });
+    client.settings.layoutVersion = SHEET_LAYOUT_VERSION;
+  }
+
   const tz = tenant.config.timezone;
   const row = [
     t.number,
@@ -459,7 +476,9 @@ async function sheetSync(job: Job) {
     formatPhone(t.phone),
     t.org_name,
     t.category ?? t.ai_category ?? '',
+    t.category ? (CATEGORY_SOURCE_LABEL[t.category_source] ?? '') : '',
     PRIORITY_LABEL[t.priority as TicketPriority],
+    t.ai_priority ? PRIORITY_LABEL[t.ai_priority as TicketPriority] : '',
     STATUS_LABEL[t.status as TicketStatus],
     t.description,
     t.ai_summary ?? '',
