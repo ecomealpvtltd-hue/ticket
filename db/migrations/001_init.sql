@@ -8,11 +8,15 @@
 -- ---------------------------------------------------------------------------
 -- Restricted application role
 -- ---------------------------------------------------------------------------
+-- Managed hosts may not allow CREATE ROLE. That's fine: tables use FORCE ROW LEVEL SECURITY,
+-- so even the owner role is held to the same tenant policies.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'support_app') THEN
     CREATE ROLE support_app NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
   END IF;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Cannot create role support_app; relying on FORCE ROW LEVEL SECURITY for the owner role';
 END $$;
 
 DO $$
@@ -255,9 +259,14 @@ CREATE POLICY system_only ON rate_limits USING (app_is_system()) WITH CHECK (app
 -- ---------------------------------------------------------------------------
 -- Privileges for the restricted role
 -- ---------------------------------------------------------------------------
-GRANT USAGE ON SCHEMA public TO support_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO support_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO support_app;
-GRANT EXECUTE ON FUNCTION app_tenant_id(), app_is_system() TO support_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO support_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO support_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'support_app') THEN
+    GRANT USAGE ON SCHEMA public TO support_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO support_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO support_app;
+    GRANT EXECUTE ON FUNCTION app_tenant_id(), app_is_system() TO support_app;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO support_app;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO support_app;
+  END IF;
+END $$;
