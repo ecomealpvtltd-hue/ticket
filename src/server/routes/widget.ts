@@ -71,7 +71,9 @@ export function registerWidgetRoutes(router: Router) {
     if (!resolved) {
       return json({ error: { code: 'invalid_key', message: 'Unknown or revoked widget key.' } }, 404, cors);
     }
-    if (origin && !originAllowed(origin, resolved.tenant.allowedOrigins)) {
+    // The platform's own origin is always allowed (the hosted /demo page).
+    const own = origin === new URL(env.baseUrl).origin;
+    if (origin && !own && !originAllowed(origin, resolved.tenant.allowedOrigins)) {
       return json({ error: { code: 'origin_not_allowed', message: `This website (${origin}) is not in the widget's allowed domains.` } }, 403, cors);
     }
     ctx.waitUntil(touchWidgetKey(resolved.tenant.id, resolved.keyId, origin).catch((e) => log.warn('widget.touch_failed', { message: errorMessage(e) })));

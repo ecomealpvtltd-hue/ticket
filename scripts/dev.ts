@@ -26,7 +26,7 @@ process.env.RELAX_RATE_LIMITS ??= 'true';
 
 const { migrate } = await import('./migrate.js');
 const { seed } = await import('./seed.js');
-const { handleApi, handleEmbed, getRouter } = await import('../src/server/app.js');
+const { handleApi, handleEmbed, handleDemo, getRouter } = await import('../src/server/app.js');
 const { runJobs } = await import('../src/server/services/jobs.js');
 
 // ---- Database -------------------------------------------------------------
@@ -99,6 +99,7 @@ createServer(async (req, res) => {
       return send(res, await handleApi(request, { ip: req.socket.remoteAddress ?? '127.0.0.1', waitUntil: (p) => { void p; } }));
     }
     if (url.pathname.startsWith('/embed/')) return send(res, await handleEmbed(await toRequest(req, PLATFORM_PORT)));
+    if (url.pathname === '/demo' || url.pathname.startsWith('/demo/')) return send(res, await handleDemo(await toRequest(req, PLATFORM_PORT)));
     if (url.pathname === '/widget.js') return serveFile(res, 'dist', 'widget.js', { 'access-control-allow-origin': '*' });
     if (url.pathname.startsWith('/assets/')) return serveFile(res, 'dist', url.pathname);
     if (url.pathname === '/' ) { res.writeHead(302, { location: '/admin' }).end(); return; }

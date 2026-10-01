@@ -68,3 +68,33 @@ export async function handleEmbed(req: Request): Promise<Response> {
     return new Response('Support is temporarily unavailable.', { status: 503, headers: { 'content-type': 'text/plain' } });
   }
 }
+
+/**
+ * Hosted demo page: /demo (Ecomeal) or /demo/<tenant-slug>. A plain page with the tenant's
+ * widget installed exactly as a customer would, for showing the product without touching a
+ * real website.
+ */
+export async function handleDemo(req: Request): Promise<Response> {
+  const slug = new URL(req.url).pathname.replace(/^\/demo\/?/, '').replace(/\/$/, '') || 'ecomeal';
+  if (!/^[a-z0-9-]{2,41}$/.test(slug)) return new Response('Not found', { status: 404 });
+  try {
+    await ensureReady();
+    const { withSystem } = await import('./db.js');
+    const { env } = await import('./env.js');
+    const row = await withSystem(async (db) => (await db.query(
+      `SELECT t.name, k.public_key FROM tenants t JOIN widget_keys k ON k.tenant_id = t.id
+        WHERE t.slug = $1 AND t.status = 'active' AND k.revoked_at IS NULL ORDER BY k.created_at LIMIT 1`, [slug])).rows[0]);
+    if (!row) return new Response('Not found', { status: 404 });
+    const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>${esc(row.name)} support demo</title>
+<style>html,body{height:100%;margin:0}body{display:grid;place-items:center;padding:24px;box-sizing:border-box;background:#f4f5f3;color:#5d665f;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
+@media (prefers-color-scheme:dark){body{background:#111413;color:#9aa59d}}p{max-width:34em;margin:0}</style></head>
+<body><p>This page stands in for your website. Click <strong>Support</strong> in the corner to raise a ticket.</p>
+<script src="${esc(env.baseUrl)}/widget.js" data-key="${esc(row.public_key)}" async></script></body></html>`;
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
+  } catch (err) {
+    log.error('demo.failed', { message: errorMessage(err) });
+    return new Response('Demo is temporarily unavailable.', { status: 503 });
+  }
+}

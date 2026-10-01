@@ -33,6 +33,11 @@ describe('widget configuration (publishable key)', () => {
     expect(bad.status).toBe(403);
   });
 
+  it("allows the platform's own origin (hosted demo page)", async () => {
+    const res = await handleApi(new Request(`${BASE}/api/widget/config?key=${t.key}`, { headers: { origin: BASE } }));
+    expect(res.status).toBe(200);
+  });
+
   it('rejects an unknown key', async () => {
     const res = await handleApi(new Request(`${BASE}/api/widget/config?key=pk_test_doesnotexist000000000`, { headers: { origin: 'https://customer.example' } }));
     expect(res.status).toBe(404);
