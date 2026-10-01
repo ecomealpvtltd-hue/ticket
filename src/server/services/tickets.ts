@@ -190,7 +190,8 @@ export async function listTickets(db: Db, tenantId: string, raw: Record<string, 
     const i = args.length;
     const clauses = [`t.number ILIKE $${i}`, `t.name ILIKE $${i}`, `t.org_name ILIKE $${i}`, `t.description ILIKE $${i}`];
     if (digits.length >= 3) { args.push('%' + digits + '%'); clauses.push(`t.phone LIKE $${args.length}`); }
-    if (/^\d+$/.test(f.q)) { args.push(Number(f.q)); clauses.push(`t.seq = $${args.length}`); }
+    // Only short numbers can be a ticket sequence; a phone number would overflow the integer column.
+    if (/^\d{1,9}$/.test(f.q)) { args.push(Number(f.q)); clauses.push(`t.seq = $${args.length}`); }
     where.push(`(${clauses.join(' OR ')})`);
   }
   const order =

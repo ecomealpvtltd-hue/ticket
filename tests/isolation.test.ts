@@ -160,8 +160,10 @@ describe('ticket workflow', () => {
     const t = await createTestTenant({ prefix: 'SRC' });
     const tok = await embedToken(t);
     await submitTicket(t, tok, validTicket({ name: 'Priya Nair', phone: '9000012345', orgName: 'Masala Box', description: 'Printer keeps jamming during rush hour' }));
-    for (const q of ['SRC-000001', '1', 'priya', '12345', 'masala', 'jamming']) {
-      const { data } = await admin(t, 'GET', `/api/admin/tickets?q=${encodeURIComponent(q)}`);
+    // Full 10-digit and international phone numbers are what the "history" link on a ticket uses.
+    for (const q of ['SRC-000001', '1', 'priya', '12345', '9000012345', '+91 90000 12345', '919000012345', 'masala', 'jamming']) {
+      const { res, data } = await admin(t, 'GET', `/api/admin/tickets?q=${encodeURIComponent(q)}`);
+      expect(res.status, q).toBe(200);
       expect(data.total, q).toBe(1);
     }
     expect((await admin(t, 'GET', `/api/admin/tickets?q=nothing-matches`)).data.total).toBe(0);
