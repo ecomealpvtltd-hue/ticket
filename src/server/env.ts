@@ -58,8 +58,15 @@ export const env = {
   get googleClientSecret(): string | undefined { return read('GOOGLE_CLIENT_SECRET'); },
   get anthropicApiKey(): string | undefined { return read('ANTHROPIC_API_KEY'); },
   get aiModel(): string { return read('AI_MODEL') ?? 'claude-haiku-4-5'; },
+  /**
+   * Where attachment bytes go. Netlify Blobs everywhere except local development and tests
+   * (BLOB_STORE=fs). The NETLIFY variable exists only at build time, not inside functions,
+   * so it can't be used to detect the runtime.
+   */
   get blobStore(): 'netlify' | 'fs' {
-    return (read('BLOB_STORE') ?? (read('NETLIFY') ? 'netlify' : 'fs')) === 'netlify' ? 'netlify' : 'fs';
+    const explicit = read('BLOB_STORE');
+    if (explicit === 'fs' || explicit === 'netlify') return explicit;
+    return this.appEnv === 'development' ? 'fs' : 'netlify';
   },
   get blobDir(): string { return read('BLOB_DIR') ?? '.local/blobs'; },
   /** Only honoured when APP_ENV=development AND the request comes to localhost. */
