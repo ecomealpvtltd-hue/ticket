@@ -486,3 +486,5 @@ a.list-row:hover { background: var(--hover); text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+.notice-detail { display: block; margin-top: 4px; color: var(--muted); font-family: var(--mono); font-size: var(--fs-xs); word-break: break-word; }

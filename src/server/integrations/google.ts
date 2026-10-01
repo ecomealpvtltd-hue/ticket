@@ -183,25 +183,24 @@ export class GoogleClient {
     }) as Promise<{ id: string; webViewLink: string }>;
   }
 
-  moveToFolder(fileId: string, folderId: string) {
-    return this.request(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?addParents=${encodeURIComponent(folderId)}&removeParents=root&fields=id`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: '{}',
-    });
-  }
-
   // ---- Sheets ------------------------------------------------------------
 
-  createSpreadsheet(title: string, sheetTitle: string) {
-    return this.request('https://sheets.googleapis.com/v4/spreadsheets?fields=spreadsheetId,spreadsheetUrl,sheets.properties', {
+  /**
+   * Create the spreadsheet directly inside our folder via Drive (no later "move", which needs
+   * access to My Drive's root that drive.file doesn't grant), then rename its first tab.
+   */
+  async createSpreadsheet(title: string, sheetTitle: string, parentId: string) {
+    const file = await this.request('https://www.googleapis.com/drive/v3/files?fields=id,webViewLink', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        properties: { title },
-        sheets: [{ properties: { title: sheetTitle, gridProperties: { frozenRowCount: 1 } } }],
-      }),
-    }) as Promise<{ spreadsheetId: string; spreadsheetUrl: string; sheets: Array<{ properties: { sheetId: number } }> }>;
+      body: JSON.stringify({ name: title, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [parentId] }),
+    }) as { id: string; webViewLink: string };
+    const meta = await this.request(`https://sheets.googleapis.com/v4/spreadsheets/${file.id}?fields=sheets.properties.sheetId`) as { sheets?: Array<{ properties: { sheetId: number } }> };
+    const sheetId = meta.sheets?.[0]?.properties?.sheetId ?? 0;
+    await this.batchUpdate(file.id, [
+      { updateSheetProperties: { properties: { sheetId, title: sheetTitle, gridProperties: { frozenRowCount: 1 } }, fields: 'title,gridProperties.frozenRowCount' } },
+    ]);
+    return { spreadsheetId: file.id, spreadsheetUrl: file.webViewLink, sheetId };
   }
 
   values(spreadsheetId: string, range: string) {
@@ -275,10 +274,9 @@ export async function connectGoogle(tenant: Tenant, adminId: string, tokens: Tok
     settings.spreadsheetId = undefined;
   }
   if (!settings.spreadsheetId || !(await client.fileExists(settings.spreadsheetId))) {
-    const ss = await client.createSpreadsheet(`${tenant.config.brand.name} Support — Tickets`, SHEET_TITLE);
-    await client.moveToFolder(ss.spreadsheetId, settings.rootFolderId!);
+    const ss = await client.createSpreadsheet(`${tenant.config.brand.name} Support — Tickets`, SHEET_TITLE, settings.rootFolderId!);
     await client.putRow(ss.spreadsheetId, `${SHEET_TITLE}!A1`, sheetHeader(tenant));
-    const sheetId = ss.sheets?.[0]?.properties?.sheetId ?? 0;
+    const sheetId = ss.sheetId;
     await client.batchUpdate(ss.spreadsheetId, [
       { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: 'userEnteredFormat.textFormat.bold' } },
       { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 8, endIndex: 10 }, properties: { pixelSize: 360 }, fields: 'pixelSize' } },

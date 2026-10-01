@@ -149,7 +149,9 @@ export function registerAuthRoutes(router: Router) {
       log.error('google.connect_failed', { message: errorMessage(err) });
       const msg = errorMessage(err);
       const code = /offline access/i.test(msg) ? 'no_refresh_token' : /Drive access/i.test(msg) ? 'scope_missing' : 'failed';
-      return back(`error=${code}`);
+      // Shown only to the signed-in admin; tokens and secrets never appear in these messages.
+      const detail = msg.replace(/[^\x20-\x7e]/g, '').slice(0, 300);
+      return back(`error=${code}&detail=${encodeURIComponent(detail)}`);
     }
   });
 }

@@ -45,6 +45,9 @@ describe('Google Sheets and Drive sync', () => {
     const settings = await connect(t, google);
     expect(settings.spreadsheetId).toBeTruthy();
     expect(google.sheets.get(settings.spreadsheetId!)![0][0]).toBe('Ticket ID');
+    // Created directly inside the support folder (no move from My Drive).
+    expect(google.files.get(settings.spreadsheetId!)!.parents).toEqual([settings.rootFolderId]);
+    expect(google.calls.some((c) => c.startsWith('PATCH'))).toBe(false);
 
     await runJobs({ budgetMs: 5000 });
     const rows = google.sheets.get(settings.spreadsheetId!)!;

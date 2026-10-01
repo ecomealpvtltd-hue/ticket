@@ -60,7 +60,12 @@ export function Integrations() {
     <div class="page">
       <PageHeader title="Integrations" description="Tickets are always saved here first. Integrations receive a copy." />
       {connected && <Notice tone="success">Google connected. Existing tickets are being copied to your Sheet.</Notice>}
-      {connectError && <Notice tone="error">{CONNECT_ERRORS[connectError] ?? CONNECT_ERRORS.failed}</Notice>}
+      {connectError && (
+        <Notice tone="error">
+          {CONNECT_ERRORS[connectError] ?? CONNECT_ERRORS.failed}
+          {search.get('detail') && <span class="notice-detail">Google said: {search.get('detail')}</span>}
+        </Notice>
+      )}
 
       <Section title="Google Sheets and Drive" description="Every ticket is added as a row in a Google Sheet, and attachments are copied to a Drive folder per ticket. The app can only access files it creates.">
         {loading && !data ? <Skeleton h={96} /> : !data!.googleConfigured ? (

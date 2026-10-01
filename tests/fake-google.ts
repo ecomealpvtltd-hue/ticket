@@ -57,6 +57,12 @@ export class FakeGoogle {
         return ok({ id, webViewLink: `https://drive.google.com/file/d/${id}/view` });
       }
       const meta = JSON.parse(String(init?.body));
+      if (meta.mimeType === 'application/vnd.google-apps.spreadsheet') {
+        const id = this.id('sheet');
+        this.files.set(id, { name: meta.name, mimeType: meta.mimeType, parents: meta.parents });
+        this.sheets.set(id, []);
+        return ok({ id, webViewLink: `https://docs.google.com/spreadsheets/d/${id}/edit` });
+      }
       const id = this.id('folder');
       this.files.set(id, { name: meta.name, mimeType: meta.mimeType, parents: meta.parents });
       return ok({ id, webViewLink: `https://drive.google.com/drive/folders/${id}` });
@@ -76,6 +82,7 @@ export class FakeGoogle {
       const rows = this.sheets.get(ssId);
       if (!rows) return new Response('{"error":{"message":"Requested entity was not found."}}', { status: 404 });
       if (action === 'batchUpdate') return ok({});
+      if (!range && method === 'GET') return ok({ sheets: [{ properties: { sheetId: 0 } }] });
       if (range && action === 'append') {
         const { values } = JSON.parse(String(init?.body));
         rows.push(values[0]);
