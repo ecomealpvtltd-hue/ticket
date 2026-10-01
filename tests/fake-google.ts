@@ -39,6 +39,13 @@ export class FakeGoogle {
     if (url.host === 'www.googleapis.com' && url.pathname.startsWith('/drive/v3/files') || url.pathname.startsWith('/upload/drive/v3/files')) {
       const f = this.fail('drive'); if (f) return f;
       const idMatch = /\/files\/([^/?]+)/.exec(url.pathname);
+      if (method === 'GET' && !idMatch && url.searchParams.get('q')) {
+        const q = url.searchParams.get('q')!;
+        const name = /name = '((?:[^'\\]|\\.)*)'/.exec(q)?.[1].replace(/\\'/g, "'");
+        const parent = /'([^']+)' in parents/.exec(q)?.[1];
+        const found = [...this.files.entries()].filter(([, f]) => f.name === name && f.parents?.includes(parent!) && f.mimeType === 'application/vnd.google-apps.folder' && !f.trashed);
+        return ok({ files: found.slice(0, 1).map(([id]) => ({ id, webViewLink: `https://drive.google.com/drive/folders/${id}` })) });
+      }
       if (method === 'GET' && idMatch) {
         const file = this.files.get(idMatch[1]);
         return file ? ok({ id: idMatch[1], trashed: !!file.trashed }) : new Response('{"error":{"message":"not found"}}', { status: 404 });

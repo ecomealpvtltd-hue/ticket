@@ -87,6 +87,9 @@ export interface GoogleSettings {
   spreadsheetId?: string;
   spreadsheetUrl?: string;
   sheetTitle?: string;
+  attachmentsFolderId?: string;
+  /** Day folder ids under Attachments, keyed by YYYY-MM-DD (tenant timezone). */
+  dayFolders?: Record<string, string>;
 }
 
 export class GoogleApiError extends Error {
@@ -159,6 +162,17 @@ export class GoogleClient {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', ...(parentId ? { parents: [parentId] } : {}) }),
     }) as Promise<{ id: string; webViewLink: string }>;
+  }
+
+  /** Find a folder this app created, by name, inside a parent (drive.file only lists our own files). */
+  async findFolder(name: string, parentId: string): Promise<{ id: string; webViewLink: string } | null> {
+    const q = `name = '${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const r = await this.request(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,webViewLink)&pageSize=1&spaces=drive`) as { files?: Array<{ id: string; webViewLink: string }> };
+    return r.files?.[0] ?? null;
+  }
+
+  async findOrCreateFolder(name: string, parentId: string) {
+    return (await this.findFolder(name, parentId)) ?? (await this.createFolder(name, parentId));
   }
 
   async fileExists(id: string): Promise<boolean> {
@@ -348,38 +362,80 @@ function formatDate(d: Date, timeZone: string) {
   }
 }
 
+/** YYYY-MM-DD in the tenant's timezone. */
+function dayKey(d: Date, timeZone: string) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Drive layout:  <Brand> Support / Attachments / 2026-10-01 / ECM-000123.png
+ * Files are named after the ticket (ECM-000123.png, ECM-000123-2.pdf for a second file); the
+ * customer's original file name is kept in the file's Drive description.
+ */
 async function driveUpload(job: Job) {
-  const { tenant, client, ticket, pending } = await withTenant(job.tenant_id, async (db) => {
+  const { tenant, client, ticket, all } = await withTenant(job.tenant_id, async (db) => {
     const client = await GoogleClient.forTenant(db, job.tenant_id);
     const tenant = await getTenant(db, job.tenant_id);
-    const t = await db.query(`SELECT id, number, meta FROM tickets WHERE id = $1`, [job.ticket_id]);
-    const a = await db.query(`SELECT id, file_name, mime_type, blob_key FROM attachments WHERE ticket_id = $1 AND drive_file_id IS NULL ORDER BY created_at`, [job.ticket_id]);
-    return { tenant, client, ticket: t.rows[0], pending: a.rows };
+    const t = await db.query(`SELECT id, number, created_at FROM tickets WHERE id = $1`, [job.ticket_id]);
+    const a = await db.query(`SELECT id, file_name, mime_type, blob_key, drive_file_id FROM attachments WHERE ticket_id = $1 ORDER BY created_at, id`, [job.ticket_id]);
+    return { tenant, client, ticket: t.rows[0], all: a.rows };
   });
   if (!ticket) throw new PermanentJobError('Ticket no longer exists');
+  const pending = all.filter((a: any) => !a.drive_file_id);
   if (!pending.length) return;
-  if (!client.settings.rootFolderId) throw new IntegrationNotConnected('Google Drive folder is not set up. Reconnect Google.');
+  const root = client.settings.rootFolderId;
+  if (!root) throw new IntegrationNotConnected('Google Drive folder is not set up. Reconnect Google.');
 
-  let folderId: string | undefined = ticket.meta?.driveFolderId;
-  if (!folderId) {
-    const folder = await client.createFolder(ticket.number, client.settings.rootFolderId);
-    folderId = folder.id;
-    await withTenant(job.tenant_id, (db) =>
-      db.query(`UPDATE tickets SET meta = meta || jsonb_build_object('driveFolderId', $2::text, 'driveFolderUrl', $3::text) WHERE id = $1`, [ticket.id, folder.id, folder.webViewLink]),
-    );
+  const saveSettings = (patch: Record<string, unknown>) => withTenant(job.tenant_id, (db) =>
+    db.query(`UPDATE integrations SET settings = settings || $2::jsonb, updated_at = now() WHERE tenant_id = $1 AND provider = 'google'`, [job.tenant_id, JSON.stringify(patch)]));
+
+  let attachmentsId = client.settings.attachmentsFolderId;
+  if (!attachmentsId || !(await client.fileExists(attachmentsId))) {
+    attachmentsId = (await client.findOrCreateFolder('Attachments', root)).id;
+    await saveSettings({ attachmentsFolderId: attachmentsId, dayFolders: {} });
+    client.settings.dayFolders = {};
+  }
+
+  const day = dayKey(new Date(ticket.created_at), tenant.config.timezone);
+  let dayId = client.settings.dayFolders?.[day];
+  let dayUrl: string | undefined;
+  if (!dayId || !(await client.fileExists(dayId))) {
+    const folder = await client.findOrCreateFolder(day, attachmentsId);
+    dayId = folder.id;
+    dayUrl = folder.webViewLink;
+    // Keep the 90 most recent days cached; older ones are looked up again if ever needed.
+    const days = { ...(client.settings.dayFolders ?? {}), [day]: dayId };
+    const recent = Object.fromEntries(Object.entries(days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 90));
+    await saveSettings({ dayFolders: recent });
   }
 
   const store = getBlobStore();
   for (const a of pending) {
+    const index = all.findIndex((x: any) => x.id === a.id);
+    const ext = (a.file_name.split('.').pop() ?? 'bin').toLowerCase();
+    const name = index === 0 ? `${ticket.number}.${ext}` : `${ticket.number}-${index + 1}.${ext}`;
     const data = await store.get(a.blob_key);
     if (!data) throw new PermanentJobError(`Stored file missing for attachment ${a.id}`);
-    const file = await client.uploadFile({ name: a.file_name, mimeType: a.mime_type, parentId: folderId!, data, description: `${tenant.name} ticket ${ticket.number}` });
+    const file = await client.uploadFile({
+      name, mimeType: a.mime_type, parentId: dayId!, data,
+      description: `${tenant.name} ticket ${ticket.number}. Original file name: ${a.file_name}`,
+    });
     await withTenant(job.tenant_id, (db) =>
       db.query(`UPDATE attachments SET drive_file_id = $2, drive_url = $3 WHERE id = $1`, [a.id, file.id, file.webViewLink]),
     );
   }
-  // Put the new links into the Sheet.
-  await withTenant(job.tenant_id, (db) => enqueueJob(db, job.tenant_id, job.ticket_id, 'sheet_sync', { blocked: false }));
+  await withTenant(job.tenant_id, async (db) => {
+    await db.query(
+      `UPDATE tickets SET meta = meta || jsonb_build_object('driveFolderId', $2::text) || CASE WHEN $3::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('driveFolderUrl', $3::text) END WHERE id = $1`,
+      [ticket.id, dayId, dayUrl ?? `https://drive.google.com/drive/folders/${dayId}`],
+    );
+    // Put the new links into the Sheet.
+    await enqueueJob(db, job.tenant_id, job.ticket_id, 'sheet_sync', { blocked: false });
+  });
 }
 
 async function sheetSync(job: Job) {
@@ -387,7 +443,7 @@ async function sheetSync(job: Job) {
     const client = await GoogleClient.forTenant(db, job.tenant_id);
     const tenant = await getTenant(db, job.tenant_id);
     const r = await db.query(`SELECT * FROM tickets WHERE id = $1`, [job.ticket_id]);
-    const a = await db.query(`SELECT file_name, drive_url FROM attachments WHERE ticket_id = $1 ORDER BY created_at`, [job.ticket_id]);
+    const a = await db.query(`SELECT file_name, drive_url FROM attachments WHERE ticket_id = $1 ORDER BY created_at, id`, [job.ticket_id]);
     return { tenant, client, t: r.rows[0], attachments: a.rows };
   });
   if (!t) throw new PermanentJobError('Ticket no longer exists');
@@ -407,7 +463,11 @@ async function sheetSync(job: Job) {
     STATUS_LABEL[t.status as TicketStatus],
     t.description,
     t.ai_summary ?? '',
-    attachments.map((a: any) => a.drive_url ? `${a.file_name}: ${a.drive_url}` : `${a.file_name} (uploading)`).join('\n'),
+    attachments.map((a: any, i: number) => {
+      const ext = (a.file_name.split('.').pop() ?? 'bin').toLowerCase();
+      const name = i === 0 ? `${t.number}.${ext}` : `${t.number}-${i + 1}.${ext}`;
+      return a.drive_url ? `${name}: ${a.drive_url}` : `${name} (uploading)`;
+    }).join('\n'),
     formatDate(new Date(t.updated_at), tz),
     `${env.baseUrl}/admin/tickets/${t.number}`,
   ];

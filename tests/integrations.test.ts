@@ -6,7 +6,7 @@ import { getTenant } from '../src/server/services/tenants.js';
 import { setAIProvider, type AIProvider } from '../src/server/ai/index.js';
 import { setBlobStore } from '../src/server/storage.js';
 import { getRouter } from '../src/server/app.js';
-import { admin, createTestTenant, embedToken, PNG, submitTicket, upload, validTicket, type TestTenant } from './helpers.js';
+import { admin, createTestTenant, embedToken, PDF, PNG, submitTicket, upload, validTicket, type TestTenant } from './helpers.js';
 import { FakeGoogle, fakeIdToken } from './fake-google.js';
 
 getRouter(); // register job handlers
@@ -57,24 +57,34 @@ describe('Google Sheets and Drive sync', () => {
     expect(rows[1][7]).toBe('Open');
   });
 
-  it('uploads attachments into a per-ticket Drive folder and links them in the Sheet', async () => {
-    const t = await createTestTenant({ prefix: 'DRV' });
+  it('files attachments under Attachments/<date>/ named after the ticket, and links them in the Sheet', async () => {
+    const t = await createTestTenant({ prefix: 'DRV', config: { timezone: 'Asia/Kolkata' } });
     const google = new FakeGoogle();
     const settings = await connect(t, google);
     const tok = await embedToken(t);
-    const up = await upload(t, tok, 'error.png', PNG, 'image/png');
-    const { data } = await submitTicket(t, tok, validTicket({ attachmentIds: [up.data.id] }));
+    const a1 = await upload(t, tok, 'Screenshot 2026-10-01 at 7.02 PM.png', PNG, 'image/png');
+    const a2 = await upload(t, tok, 'invoice.pdf', PDF, 'application/pdf');
+    const { data } = await submitTicket(t, tok, validTicket({ attachmentIds: [a1.data.id, a2.data.id] }));
+    const second = await submitTicket(t, tok, validTicket({ attachmentIds: [(await upload(t, tok, 'x.png', PNG, 'image/png')).data.id] }));
     await runJobs({ budgetMs: 5000 });
 
-    const folder = [...google.files.entries()].find(([, f]) => f.name === data.ticket.number);
-    expect(folder).toBeTruthy();
-    expect(folder![1].parents).toEqual([settings.rootFolderId]);
-    const file = [...google.files.values()].find((f) => f.name === 'error.png');
-    expect(file?.parents).toEqual([folder![0]]);
+    const byName = (n: string) => [...google.files.entries()].filter(([, f]) => f.name === n);
+    const attachments = byName('Attachments');
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0][1].parents).toEqual([settings.rootFolderId]);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const dayFolders = byName(today);
+    expect(dayFolders).toHaveLength(1); // both tickets share one day folder
+    expect(dayFolders[0][1].parents).toEqual([attachments[0][0]]);
+    expect(byName(`${data.ticket.number}.png`)[0][1].parents).toEqual([dayFolders[0][0]]);
+    expect(byName(`${data.ticket.number}-2.pdf`)).toHaveLength(1);
+    expect(byName(`${second.data.ticket.number}.png`)[0][1].parents).toEqual([dayFolders[0][0]]);
+    expect(byName(data.ticket.number)).toHaveLength(0); // no per-ticket folders any more
+
     const row = google.sheets.get(settings.spreadsheetId!)!.find((r) => r[0] === data.ticket.number)!;
-    expect(row[10]).toMatch(/^error\.png: https:\/\/drive\.google\.com\/file\/d\//);
+    expect(row[10]).toMatch(new RegExp(`^${data.ticket.number}\\.png: https://drive\\.google\\.com/file/d/.+\\n${data.ticket.number}-2\\.pdf: https://`));
     const detail = (await admin(t, 'GET', `/api/admin/tickets/${data.ticket.number}`)).data;
-    expect(detail.attachments[0].driveUrl).toMatch(/drive\.google\.com/);
+    expect(detail.attachments.every((x: any) => /drive\.google\.com/.test(x.driveUrl))).toBe(true);
     expect(detail.sync.drive_upload.status).toBe('done');
     expect(detail.sync.sheet_sync.status).toBe('done');
   });

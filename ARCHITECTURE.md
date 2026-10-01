@@ -40,7 +40,7 @@ Services required: Netlify, one Postgres, Google Cloud project (free), optionall
               │
               ▼
    integration_jobs (outbox)          Netlify Scheduled Function "sync" (*/5 * * * *)
-     drive_upload  → Drive folder per ticket     picks up anything due, retries with backoff
+     drive_upload  → Drive: Attachments/<date>/ECM-000123.png     picks up anything due, retries with backoff
      sheet_sync    → upsert Sheet row by ID      1m, 5m, 15m, 1h, 3h, 6h, 12h … then "failed"
      ai_triage     → category, priority hint, summary        (manual retry in dashboard)
 ```
@@ -175,7 +175,9 @@ larger files would need direct-to-storage uploads (future).
 - Each tenant connects its own Google account from Integrations (OAuth, offline access).
 - Scope: **`drive.file` only**. The app can create and edit files it created, and nothing else in
   the tenant's Drive. It creates `"<Brand> Support"` folder → `"<Brand> Support — Tickets"`
-  spreadsheet (tab "Tickets", bold frozen header) and one sub-folder per ticket for attachments.
+  spreadsheet (tab "Tickets", bold frozen header) and an `Attachments` folder with one sub-folder
+  per day (`2026-10-01`, tenant timezone). Files are named after the ticket (`ECM-000123.png`,
+  `ECM-000123-2.pdf`); the customer's original file name is kept in the file's Drive description.
 - Rows are written with `valueInputOption=RAW` so customer text is never evaluated as a formula.
   Rows are matched by ticket ID, so status changes update the same row.
 - Refresh tokens are encrypted with AES-256-GCM. If Google access is revoked (`invalid_grant`)

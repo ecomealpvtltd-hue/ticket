@@ -54,7 +54,7 @@ Priority: Low, Medium, High, Urgent.
 ## Integration flow
 
 Ticket saved → response to the customer → copies made in the background:
-Drive folder `ECM-000123/` with attachments → Sheet row (updated on every change) → AI summary.
+Drive `Attachments/2026-10-01/ECM-000123.png` → Sheet row (updated on every change) → AI summary.
 Each shows as Synced, Pending, Retrying, Waiting for Google or Failed on the ticket, and failures
 are listed under Integrations with a Retry button.
 
